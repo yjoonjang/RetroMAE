@@ -130,3 +130,5 @@ try.py
 
 # Pyre type checker
 .pyre/
+
+wandb/

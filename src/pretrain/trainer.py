@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class PreTrainer(Trainer):
-    def log(self, logs: Dict[str, float]) -> None:
+    def log(self, logs: Dict[str, float], start_time: Optional[float] = None) -> None:
         """
         Log `logs` on the various objects watching training.
 

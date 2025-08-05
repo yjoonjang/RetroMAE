@@ -1,7 +1,7 @@
 import logging
 import os
 import sys
-
+import torch
 import transformers
 from pretrain.arguments import DataTrainingArguments, ModelArguments
 from pretrain.data import DatasetForPretraining, RetroMAECollator, DupMAECollator
@@ -10,7 +10,7 @@ from pretrain.modeling_duplex import DupMAEForPretraining
 from pretrain.trainer import PreTrainer
 from transformers import (
     AutoTokenizer,
-    BertForMaskedLM,
+    ModernBertForMaskedLM,
     AutoConfig,
     HfArgumentParser, set_seed, )
 from transformers import (
@@ -96,12 +96,13 @@ def main():
         raise NotImplementedError
 
     if model_args.model_name_or_path:
-        model = model_class.from_pretrained(model_args, model_args.model_name_or_path)
+        model = model_class.from_pretrained(model_args, model_args.model_name_or_path, attn_implementation="flash_attention_2", torch_dtype=torch.bfloat16)
+        # model = model_class.from_pretrained(model_args, model_args.model_name_or_path)
         logger.info(f"------Load model from {model_args.model_name_or_path}------")
         tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     elif model_args.config_name:
         config = AutoConfig.from_pretrained(model_args.config_name)
-        bert = BertForMaskedLM(config)
+        bert = ModernBertForMaskedLM(config)
         model = model_class(bert, model_args)
         logger.info("------Init the model------")
         tokenizer = AutoTokenizer.from_pretrained(data_args.tokenizer_name)
