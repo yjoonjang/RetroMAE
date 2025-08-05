@@ -50,6 +50,51 @@ def create_book_data(tokenizer_name: str,
                                                     remove_columns=["input_ids"])
     return processed_bookcorpus
 
+def create_kure_data(tokenizer_name: str,
+                     max_seq_length: int,
+                     short_seq_prob: float = 0.0):
+    import nltk
+    nltk.download('punkt')
+
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+    target_length = max_seq_length - tokenizer.num_special_tokens_to_add(pair=False)
+
+    def kure_tokenize_function(examples):
+        sentences = []
+        for sents in examples['sentences']:
+            sentences.append(
+                tokenizer(sents, add_special_tokens=False, truncation=False, return_attention_mask=False,
+                          return_token_type_ids=False)['input_ids'])
+        return {"input_ids": sentences}
+
+    def sentence_kure(examples):
+        sentences = nltk.sent_tokenize(examples["text"])
+        return {"sentences": sentences}
+
+    def kure_pad_each_line(examples):
+        blocks = []
+        for sents in examples['input_ids']:
+            curr_block = []
+            curr_tgt_len = target_length if random.random() > short_seq_prob else random.randint(3, target_length)
+            for sent in sents:
+                if len(curr_block) >= curr_tgt_len:
+                    blocks.append(curr_block)
+                    curr_block = []
+                    curr_tgt_len = target_length if random.random() > short_seq_prob \
+                        else random.randint(3, target_length)
+                curr_block.extend(sent)
+            if len(curr_block) > 0:
+                blocks.append(curr_block)
+        return {'token_ids': blocks}
+    
+    kure = load_dataset('json', data_files='/data_x/EMBEDDING/DATA/SFT/corpus/RETRIEVAL/HAERAE-KOREAN-WEBTEXT/corpus.jsonl', split='train')
+    kure = kure.remove_columns("id")
+    kure = kure.map(sentence_kure, num_proc=32, remove_columns=["title", "text"])
+    tokenized_kure = kure.map(kure_tokenize_function, num_proc=32, batched=True, remove_columns=["sentences"])
+    processed_kure = tokenized_kure.map(kure_pad_each_line, num_proc=32, batched=True, remove_columns=["input_ids"])
+
+    return processed_kure
+
 
 def create_wiki_data(tokenizer_name: str,
                      max_seq_length: int,
@@ -77,6 +122,7 @@ def create_wiki_data(tokenizer_name: str,
         for sents in examples['input_ids']:
             curr_block = []
             curr_tgt_len = target_length if random.random() > short_seq_prob else random.randint(3, target_length)
+
             for sent in sents:
                 if len(curr_block) >= curr_tgt_len:
                     blocks.append(curr_block)
@@ -118,8 +164,7 @@ def create_passage_data(tokenizer_name: str,
         blocks = []
         for sents in examples['input_ids']:
             curr_block = []
-            curr_tgt_len = target_length if random.random() > short_seq_prob else random.randint(3,
-                                                                                                 target_length)
+            curr_tgt_len = target_length if random.random() > short_seq_prob else random.randint(3, target_length)
             for sent in sents:
                 if len(curr_block) >= curr_tgt_len:
                     blocks.append(curr_block)
@@ -153,6 +198,10 @@ if __name__ == '__main__':
     elif args.data == 'msmarco_passage':
         print('download and preprocess msmarco-passage:')
         dataset = create_passage_data(args.tokenizer_name, args.max_seq_length, args.short_seq_prob)
+        dataset.save_to_disk(args.output_dir)
+    elif args.data == 'kure':
+        print('download and preprocess kure:')
+        dataset = create_kure_data(args.tokenizer_name, args.max_seq_length, args.short_seq_prob)
         dataset.save_to_disk(args.output_dir)
     else:
         raise NotImplementedError
