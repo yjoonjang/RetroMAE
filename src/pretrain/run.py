@@ -108,7 +108,8 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained(data_args.tokenizer_name)
     else:
         raise ValueError("You must provide the model_name_or_path or config_name")
-
+    print(f"Loaded model: {model_args.model_name_or_path} !!")
+    
     dataset = DatasetForPretraining(data_args.data_dir, test=True)
     data_collator = collator_class(tokenizer,
                                      encoder_mlm_probability=data_args.encoder_mlm_probability,

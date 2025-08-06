@@ -129,7 +129,8 @@ class DupMAECollator(DataCollatorForWholeWordMask):
             encoder_mlm_mask_batch.append(torch.tensor(text_encoder_mlm_mask))
             decoder_matrix_attention_mask_batch.append(1 - torch.tensor(text_matrix_attention_mask))
 
-            weight = torch.zeros(size=(self.tokenizer.vocab_size,))
+            # weight = torch.zeros(size=(self.tokenizer.vocab_size,))
+            weight = torch.zeros(size=(len(self.tokenizer),))
             for t in e['token_ids'][:tgt_len]:
                 weight[t] = 1 / len(e['token_ids'][:tgt_len])
             bag_word_weight.append(weight.unsqueeze(0))

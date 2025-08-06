@@ -63,7 +63,8 @@ model_names = [
 ]
 model_names = [
     # "/mnt/raid6/yjoonjang/projects/RetroMAE/MODELS/checkpoint-375"
-    "skt/A.X-Encoder-base"
+    # "skt/A.X-Encoder-base"
+    "/mnt/raid6/yjoonjang/projects/RetroMAE/MODELS/skt_A.X-Encoder-base-dupmae"
 ] + model_names
 
 save_path = "./RESULTS"
