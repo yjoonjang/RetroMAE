@@ -132,3 +132,5 @@ try.py
 .pyre/
 
 wandb/
+MODELS/
+pretrain_data/

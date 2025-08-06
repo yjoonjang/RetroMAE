@@ -109,7 +109,7 @@ def main():
     else:
         raise ValueError("You must provide the model_name_or_path or config_name")
 
-    dataset = DatasetForPretraining(data_args.data_dir)
+    dataset = DatasetForPretraining(data_args.data_dir, test=True)
     data_collator = collator_class(tokenizer,
                                      encoder_mlm_probability=data_args.encoder_mlm_probability,
                                      decoder_mlm_probability=data_args.decoder_mlm_probability,

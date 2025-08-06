@@ -9,8 +9,11 @@ from transformers import DataCollatorForWholeWordMask
 
 
 class DatasetForPretraining(torch.utils.data.Dataset):
-    def __init__(self, data_dir):
-        self.dataset = Dataset.load_from_disk(data_dir)
+    def __init__(self, data_dir, test=False):
+        if test:
+            self.dataset = Dataset.load_from_disk(data_dir).select(range(3000))
+        else:
+            self.dataset = Dataset.load_from_disk(data_dir)
 
     def __getitem__(self, item):
         return self.dataset[item]

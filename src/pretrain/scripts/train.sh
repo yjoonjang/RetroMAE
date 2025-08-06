@@ -4,7 +4,7 @@ SHORT_MODEL_NAME="A.X-Encoder-base"
 export WANDB_PROJECT="RetroMAE"
 export WANDB_NAME="test-${SHORT_MODEL_NAME}-250806"
 
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun --nproc_per_node 8 \
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc_per_node 4 \
   -m pretrain.run \
   --output_dir /mnt/raid6/yjoonjang/projects/RetroMAE/MODELS \
   --data_dir /mnt/raid6/yjoonjang/projects/RetroMAE/examples/pretrain/pretrain_data/kure \
@@ -16,8 +16,8 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun --nproc_per_node 8 \
   --learning_rate 1e-4 \
   --report_to wandb \
   --bf16 True \
-  --per_device_train_batch_size 4 \
-  --save_strategy steps \
+  --per_device_train_batch_size 2 \
+  --save_strategy epoch \
   --save_steps 0.1 \
   --logging_steps 1 \
   --seed 42 \
