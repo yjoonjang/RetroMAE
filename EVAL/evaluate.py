@@ -55,7 +55,7 @@ TASK_LIST_RETRIEVAL_GPU_MAPPING = {
         "MultiLongDocRetrieval",
     ],
     2: ["MIRACLRetrieval"],
-    3: ["MrTidyRetrieval"],
+    0: ["MrTidyRetrieval"],
 }
 
 model_names = [
@@ -64,7 +64,8 @@ model_names = [
 model_names = [
     # "/mnt/raid6/yjoonjang/projects/RetroMAE/MODELS/checkpoint-375"
     # "skt/A.X-Encoder-base"
-    "/mnt/raid6/yjoonjang/projects/RetroMAE/MODELS/skt_A.X-Encoder-base-dupmae"
+    # "/mnt/raid6/yjoonjang/projects/RetroMAE/MODELS/skt_A.X-Encoder-base-dupmae"
+    "BAAI/bge-m3-retromae"
 ] + model_names
 
 save_path = "./RESULTS"
@@ -73,10 +74,13 @@ def evaluate_model(model_name, gpu_id, tasks):
     import torch
     try:
         # CUDA 디바이스 설정을 더 명확하게
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-        torch.cuda.empty_cache()
-        device = torch.device(f"cuda:1")  # CUDA_VISIBLE_DEVICES로 인해 항상 0번이 됨
+        # os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+        # torch.cuda.empty_cache()
+        # device = torch.device(f"cuda:0")
+        # torch.cuda.set_device(device)
+        device = torch.device(f"cuda:{str(gpu_id)}") 
         torch.cuda.set_device(device)
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
 
         
         model = None
@@ -118,7 +122,7 @@ def evaluate_model(model_name, gpu_id, tasks):
                     # model = mteb.get_model(model_name, device=device)
                     model = SentenceTransformerWrapper(
                         model=model_name, 
-                        model_kwargs={"attn_implementation": "sdpa", "torch_dtype": torch.bfloat16}, 
+                        model_kwargs={"torch_dtype": torch.bfloat16}, 
                         device=device, 
                         tokenizer_kwargs={"model_max_length": 8192}
                     )
@@ -127,6 +131,7 @@ def evaluate_model(model_name, gpu_id, tasks):
                         model.model.tokenizer.model_input_names = [name for name in model.model.tokenizer.model_input_names if name != 'token_type_ids']
                     model.model._modules["1"].pooling_mode_mean_tokens = False
                     model.model._modules["1"].pooling_mode_cls_token = True
+                    logging.info("using CLS pooling ...")
         else: # 직접 학습한 모델의 경우
             file_name = os.path.join(model_name, "model.safetensors")
             if os.path.exists(file_name):
