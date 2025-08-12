@@ -51,49 +51,57 @@ def create_book_data(tokenizer_name: str,
     return processed_bookcorpus
 
 def create_kure_data(tokenizer_name: str,
-                     max_seq_length: int,
-                     short_seq_prob: float = 0.0):
-    import nltk
-    nltk.download('punkt')
-
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+                     max_seq_length: int):
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, model_max_length=max_seq_length)
     target_length = max_seq_length - tokenizer.num_special_tokens_to_add(pair=False)
 
-    def kure_tokenize_function(examples):
-        sentences = []
-        for sents in examples['sentences']:
-            sentences.append(
-                tokenizer(sents, add_special_tokens=False, truncation=False, return_attention_mask=False,
-                          return_token_type_ids=False)['input_ids'])
-        return {"input_ids": sentences}
+    def tokenize_function(examples):
+        outputs = tokenizer(
+            examples['text'],
+            add_special_tokens=False,
+            truncation=False,
+            return_attention_mask=False,
+            return_token_type_ids=False,
+        )
+        for i in range(len(outputs['input_ids'])):
+            outputs['input_ids'][i].append(tokenizer.sep_token_id)
+        return outputs
 
-    def sentence_kure(examples):
-        sentences = nltk.sent_tokenize(examples["text"])
-        return {"sentences": sentences}
+    def group_texts(examples):
+        concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+        total_length = len(concatenated_examples[list(examples.keys())[0]])
+        
+        if total_length < target_length:
+            return {'token_ids': []}
 
-    def kure_pad_each_line(examples):
-        blocks = []
-        for sents in examples['input_ids']:
-            curr_block = []
-            curr_tgt_len = target_length if random.random() > short_seq_prob else random.randint(3, target_length)
-            for sent in sents:
-                if len(curr_block) >= curr_tgt_len:
-                    blocks.append(curr_block)
-                    curr_block = []
-                    curr_tgt_len = target_length if random.random() > short_seq_prob \
-                        else random.randint(3, target_length)
-                curr_block.extend(sent)
-            if len(curr_block) > 0:
-                blocks.append(curr_block)
-        return {'token_ids': blocks}
+        total_length = (total_length // target_length) * target_length
+        
+        # Split by chunks of max_len
+        result = {
+            k: [t[i : i + target_length] for i in range(0, total_length, target_length)]
+            for k, t in concatenated_examples.items()
+        }
+        # Rename the key to 'token_ids'
+        result['token_ids'] = result.pop('input_ids')
+        return result
+
+    dataset = load_dataset('json', data_files='/mnt/raid6/yjoonjang/projects/RetroMAE/examples/pretrain/raw/retromae_test_corpus.jsonl', split='train', cache_dir=None, num_proc=32)
     
-    kure = load_dataset('json', data_files='/data_x/EMBEDDING/DATA/SFT/corpus/RETRIEVAL/HAERAE-KOREAN-WEBTEXT/corpus.jsonl', split='train')
-    kure = kure.remove_columns("id")
-    kure = kure.map(sentence_kure, num_proc=32, remove_columns=["title", "text"])
-    tokenized_kure = kure.map(kure_tokenize_function, num_proc=32, batched=True, remove_columns=["sentences"])
-    processed_kure = tokenized_kure.map(kure_pad_each_line, num_proc=32, batched=True, remove_columns=["input_ids"])
+    tokenized_dataset = dataset.map(
+        tokenize_function,
+        batched=True,
+        num_proc=32,
+        remove_columns=dataset.column_names
+    )
 
-    return processed_kure
+    processed_dataset = tokenized_dataset.map(
+        group_texts,
+        batched=True,
+        num_proc=32,
+        remove_columns=tokenized_dataset.column_names
+    )
+
+    return processed_dataset
 
 
 def create_wiki_data(tokenizer_name: str,
@@ -201,7 +209,7 @@ if __name__ == '__main__':
         dataset.save_to_disk(args.output_dir)
     elif args.data == 'kure':
         print('download and preprocess kure:')
-        dataset = create_kure_data(args.tokenizer_name, args.max_seq_length, args.short_seq_prob)
+        dataset = create_kure_data(args.tokenizer_name, args.max_seq_length)
         dataset.save_to_disk(args.output_dir)
     else:
         raise NotImplementedError

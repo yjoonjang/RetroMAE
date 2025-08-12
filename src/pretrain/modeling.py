@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 class OneStepDecoder(nn.Module):
     def __init__(self, base_layer):
         super().__init__()
-        self.layer = base_layer            # ModernBertEncoderLayer(eager+padded RoPE)
+        self.layer = base_layer            
 
     def forward(self, query, key, value,
                 attention_mask=None,
-                position_ids=None,         # ★ 받도록 선언
+                position_ids=None,         
                 **kw):
         hidden_states = query              # RetroMAE: Q = CLS-broadcast
         if position_ids is None:
@@ -59,44 +59,103 @@ class RetroMAEForPretraining(nn.Module):
 
         self.model_args = model_args
 
+    # def forward(self,
+    #             encoder_input_ids, encoder_attention_mask, encoder_labels,
+    #             decoder_input_ids, decoder_attention_mask, decoder_labels):
+
+    #     lm_out: MaskedLMOutput = self.lm(
+    #         encoder_input_ids,
+    #         encoder_attention_mask,
+    #         # labels=encoder_labels,
+    #         output_hidden_states=True,
+    #         output_attentions=False,  
+    #         return_dict=True
+    #     )
+        
+    #     encoder_logits = lm_out.logits
+    #     loss_enc = self.cross_entropy(
+    #         encoder_logits.view(-1, self.lm.config.vocab_size),
+    #         encoder_labels.view(-1)
+    #     )
+
+    #     last_hidden = lm_out.hidden_states[-1]
+    #     if last_hidden.dim() == 2:
+    #         B, L = encoder_attention_mask.shape
+    #         H = last_hidden.size(-1)
+    #         repad = torch.zeros(B * L, H,
+    #                             device=last_hidden.device,
+    #                             dtype=last_hidden.dtype)
+    #         repad[encoder_attention_mask.view(-1).bool()] = last_hidden
+    #         last_hidden = repad.view(B, L, H)
+
+    #     cls_hiddens = last_hidden[:, :1]
+
+    #     decoder_embedding_output = self.decoder_embeddings(input_ids=decoder_input_ids)
+    #     hiddens = torch.cat([cls_hiddens, decoder_embedding_output[:, 1:]], dim=1)
+
+    #     seq_len = hiddens.size(1)
+    #     query = cls_hiddens.expand(-1, seq_len, -1).contiguous()
+
+    #     matrix_attention_mask = self.lm.get_extended_attention_mask(
+    #         decoder_attention_mask,
+    #         decoder_attention_mask.shape,
+    #         decoder_attention_mask.device
+    #     )
+
+    #     hiddens = self.c_head(query=query,
+    #                           key=hiddens,
+    #                           value=hiddens,
+    #                           attention_mask=matrix_attention_mask)[0]
+        
+    #     # 4. dec loss
+    #     pred_scores, loss_dec = self.mlm_loss(hiddens, decoder_labels)
+
+    #     # 5. 두 loss를 합쳐서 반환
+    #     return (loss_enc + loss_dec,)
+
     def forward(self,
                 encoder_input_ids, encoder_attention_mask, encoder_labels,
                 decoder_input_ids, decoder_attention_mask, decoder_labels):
-        # return (torch.sum(self.lm.bert.embeddings.position_ids[:, :decoder_input_ids.size(1)]), )
+
+        # 1. 인코더에서 hs
         lm_out: MaskedLMOutput = self.lm(
-            encoder_input_ids, 
+            encoder_input_ids,
             encoder_attention_mask,
-            labels=encoder_labels,
             output_hidden_states=True,
+            output_attentions=False,
             return_dict=True
         )
-        # cls_hiddens = lm_out.hidden_states[-1][:, :1]  # B 1 D
-        last_hidden = lm_out.hidden_states[-1]              # (T,H) or (B,L,H)
-        if last_hidden.dim() == 2:                          # unpadded → repad
+        last_hidden = lm_out.hidden_states[-1]
+
+        if last_hidden.dim() == 2:
             B, L = encoder_attention_mask.shape
             H = last_hidden.size(-1)
-            repad = torch.zeros(B * L, H,
-                                device=last_hidden.device,
-                                dtype=last_hidden.dtype)
+            # 0으로 채워진 전체 크기의 텐서를 만들고
+            repad = torch.zeros(B * L, H, device=last_hidden.device, dtype=last_hidden.dtype)
+            # 실제 토큰이 있는 위치에만 hidden_state를 채워 넣습니다.
             repad[encoder_attention_mask.view(-1).bool()] = last_hidden
+            # 마지막으로 [B, L, H] 형태로 재구성합니다.
             last_hidden = repad.view(B, L, H)
 
+        # 2. 마스킹된 토큰 위치 & 그 토큰들의 hs
+        masked_indices = (encoder_labels != -100)
+        masked_hidden_states = last_hidden[masked_indices]
+        
+        prediction_head_output = self.lm.head(masked_hidden_states)
+        masked_logits = self.lm.decoder(prediction_head_output)
+
+        # 3. 마스킹된 위치의 정답 레이블
+        masked_true_labels = encoder_labels[masked_indices]
+        loss_enc = self.cross_entropy(masked_logits, masked_true_labels)
+
+        # 4. decoder 부분
         cls_hiddens = last_hidden[:, :1]
 
-        # cls_hiddens = padded_hidden[:, :1]
-
         decoder_embedding_output = self.decoder_embeddings(input_ids=decoder_input_ids)
-        # tok = self.decoder_embeddings.tok_embeddings(decoder_input_ids)
-        # tok = self.decoder_embeddings.norm(tok)
-        # decoder_embedding_output = self.decoder_embeddings.drop(tok) 
         hiddens = torch.cat([cls_hiddens, decoder_embedding_output[:, 1:]], dim=1)
 
-        # decoder_position_ids = self.lm.bert.embeddings.position_ids[:, :decoder_input_ids.size(1)]
-        # decoder_position_embeddings = self.lm.bert.embeddings.position_embeddings(decoder_position_ids)  # B L D
-        # query = decoder_position_embeddings + cls_hiddens
-
         seq_len = hiddens.size(1)
-        query = cls_hiddens.expand(-1, seq_len, -1).contiguous() 
+        query = cls_hiddens.expand(-1, seq_len, -1).contiguous()
 
         matrix_attention_mask = self.lm.get_extended_attention_mask(
             decoder_attention_mask,
@@ -108,18 +167,24 @@ class RetroMAEForPretraining(nn.Module):
                               key=hiddens,
                               value=hiddens,
                               attention_mask=matrix_attention_mask)[0]
-        pred_scores, loss = self.mlm_loss(hiddens, decoder_labels)
 
-        return (loss + lm_out.loss,)
+        pred_scores, loss_dec = self.mlm_loss(hiddens, decoder_labels)
+
+        # 5. 두 loss 합쳐서 반환
+        return (loss_enc + loss_dec,)
 
     def mlm_loss(self, hiddens, labels):
-        hidden = self.lm.head(hiddens)
-        pred_scores = self.lm.decoder(hidden)
-        masked_lm_loss = self.cross_entropy(
-            pred_scores.view(-1, self.lm.config.vocab_size),
-            labels.view(-1)
-        )
-        return pred_scores, masked_lm_loss
+        masked_indices = (labels != -100)
+        masked_hidden_states = hiddens[masked_indices]
+
+        prediction_head_output = self.lm.head(masked_hidden_states)
+        masked_logits = self.lm.decoder(prediction_head_output)
+
+        masked_true_labels = labels[masked_indices]
+
+        masked_lm_loss = self.cross_entropy(masked_logits, masked_true_labels)
+
+        return None, masked_lm_loss
 
     def save_pretrained(self, output_dir: str):
         self.lm.save_pretrained(output_dir)

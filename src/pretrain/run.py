@@ -96,7 +96,14 @@ def main():
         raise NotImplementedError
 
     if model_args.model_name_or_path:
-        model = model_class.from_pretrained(model_args, model_args.model_name_or_path, attn_implementation="flash_attention_2", torch_dtype=torch.bfloat16)
+        model = model_class.from_pretrained(
+            model_args, 
+            model_args.model_name_or_path, 
+            attn_implementation="flash_attention_2", 
+            torch_dtype=torch.bfloat16, 
+            sparse_prediction=True, 
+            decoder_bias=False
+        )
         # model = model_class.from_pretrained(model_args, model_args.model_name_or_path)
         logger.info(f"------Load model from {model_args.model_name_or_path}------")
         tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)

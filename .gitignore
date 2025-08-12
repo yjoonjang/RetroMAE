@@ -134,3 +134,4 @@ try.py
 wandb/
 MODELS/
 pretrain_data/
+raw/

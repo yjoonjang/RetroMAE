@@ -41,8 +41,24 @@ logger = logging.getLogger("main")
 # MIRACL, MrTidy는 평가 시 시간이 오래 걸리기 때문에, 태스크별로 나누어 multiprocessing으로 평가합니다.
 # 필요 시 GPU 번호를 다르게 조정해 주세요.
 
+# TASK_LIST_RETRIEVAL_GPU_MAPPING = {
+#     4: [
+#         "Ko-StrategyQA",
+#         "AutoRAGRetrieval",
+#         "PublicHealthQA",
+#         "BelebeleRetrieval",
+#         "XPQARetrieval",
+#         # "KoFinMarketReportRetrieval",
+#         # "KoFSSFinDictRetrieval",
+#         # "KoSquadv1Retrieval",
+#         # "KoTATQARetrieval",
+#         "MultiLongDocRetrieval",
+#     ],
+#     5: ["MIRACLRetrieval"],
+#     0: ["MrTidyRetrieval"],
+# }
 TASK_LIST_RETRIEVAL_GPU_MAPPING = {
-    1: [
+    6: [
         "Ko-StrategyQA",
         "AutoRAGRetrieval",
         "PublicHealthQA",
@@ -53,9 +69,9 @@ TASK_LIST_RETRIEVAL_GPU_MAPPING = {
         # "KoSquadv1Retrieval",
         # "KoTATQARetrieval",
         "MultiLongDocRetrieval",
+        "MrTidyRetrieval",
     ],
-    2: ["MIRACLRetrieval"],
-    0: ["MrTidyRetrieval"],
+    7: ["MIRACLRetrieval"],
 }
 
 model_names = [
@@ -65,7 +81,9 @@ model_names = [
     # "/mnt/raid6/yjoonjang/projects/RetroMAE/MODELS/checkpoint-375"
     # "skt/A.X-Encoder-base"
     # "/mnt/raid6/yjoonjang/projects/RetroMAE/MODELS/skt_A.X-Encoder-base-dupmae"
-    "BAAI/bge-m3-retromae"
+    # "BAAI/bge-m3-retromae"
+    # "/mnt/raid6/yjoonjang/projects/RetroMAE/MODELS/skt_A.X-Encoder-base-dupmae-8192"
+    "/mnt/raid6/yjoonjang/projects/RetroMAE/MODELS/skt_A.X-Encoder-base-retromae-8192"
 ] + model_names
 
 save_path = "./RESULTS"
