@@ -38,22 +38,22 @@ class RetroMAECollator(DataCollatorForWholeWordMask):
         tgt_len = self.max_seq_length - self.tokenizer.num_special_tokens_to_add(False)
 
         for e in examples:
-            e_trunc = self.tokenizer.build_inputs_with_special_tokens(e['token_ids'][:tgt_len])
+            e_trunc = self.tokenizer.build_inputs_with_special_tokens(e['token_ids'][:tgt_len]) # 여기서 맨 앞에 cls, 맨 마지막에 sep가 붙는데.. 맨 마지막에 sep를 어떻게 하지
             tokens = [self.tokenizer._convert_id_to_token(tid) for tid in e_trunc]
 
             self.mlm_probability = self.encoder_mlm_probability
-            text_encoder_mlm_mask = self._whole_word_mask(tokens)
+            text_encoder_mlm_mask = self._whole_word_mask(tokens, max_predictions=self.max_seq_length)
 
             self.mlm_probability = self.decoder_mlm_probability
             mask_set = []
             for _ in range(min(len(tokens), 256)):
-                mask_set.append(self._whole_word_mask(tokens))
+                mask_set.append(self._whole_word_mask(tokens, max_predictions=self.max_seq_length))
 
-            text_matrix_attention_mask = []
+            text_matrix_attention_mask = [] # 각 input 토큰마다 전체 토큰에 대한 마스크를 가지고 있음. (자기 자신 토큰은 무조건 마스킹)
             for i in range(len(tokens)):
                 idx = random.randint(0, min(len(tokens), 256) - 1)
                 text_decoder_mlm_mask = deepcopy(mask_set[idx])
-                text_decoder_mlm_mask[i] = 1
+                text_decoder_mlm_mask[i] = 1 # 자기 자신 토큰은 무조건 마스킹
                 text_matrix_attention_mask.append(text_decoder_mlm_mask)
 
             input_ids_batch.append(torch.tensor(e_trunc))
@@ -106,12 +106,12 @@ class DupMAECollator(DataCollatorForWholeWordMask):
             tokens = [self.tokenizer._convert_id_to_token(tid) for tid in e_trunc]
 
             self.mlm_probability = self.encoder_mlm_probability
-            text_encoder_mlm_mask = self._whole_word_mask(tokens)
+            text_encoder_mlm_mask = self._whole_word_mask(tokens, max_predictions=self.max_seq_length)
 
             self.mlm_probability = self.decoder_mlm_probability
             mask_set = []
             for _ in range(min(len(tokens), 256)):
-                mask_set.append(self._whole_word_mask(tokens))
+                mask_set.append(self._whole_word_mask(tokens, max_predictions=self.max_seq_length))
 
             text_matrix_attention_mask = []
             for i in range(len(tokens)):
