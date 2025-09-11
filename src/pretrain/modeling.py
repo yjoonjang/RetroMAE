@@ -21,15 +21,14 @@ class OneStepDecoder(nn.Module):
                 attention_mask=None,
                 position_ids=None,         
                 **kw):
-        hidden_states = query              # RetroMAE: Q = CLS-broadcast
+        hidden_states = query              
         if position_ids is None:
-            # (B,L) position_ids = 0..L-1
             B, L, _ = hidden_states.size()
             position_ids = torch.arange(L, device=hidden_states.device).unsqueeze(0).expand(B, L)
 
         return self.layer(hidden_states,
             attention_mask=attention_mask,
-            position_ids=position_ids,   # ★ 넘겨줌
+            position_ids=position_ids,
             **kw
         )
 
@@ -58,60 +57,6 @@ class RetroMAEForPretraining(nn.Module):
         self.cross_entropy = nn.CrossEntropyLoss()
 
         self.model_args = model_args
-
-    # def forward(self,
-    #             encoder_input_ids, encoder_attention_mask, encoder_labels,
-    #             decoder_input_ids, decoder_attention_mask, decoder_labels):
-
-    #     lm_out: MaskedLMOutput = self.lm(
-    #         encoder_input_ids,
-    #         encoder_attention_mask,
-    #         # labels=encoder_labels,
-    #         output_hidden_states=True,
-    #         output_attentions=False,  
-    #         return_dict=True
-    #     )
-        
-    #     encoder_logits = lm_out.logits
-    #     loss_enc = self.cross_entropy(
-    #         encoder_logits.view(-1, self.lm.config.vocab_size),
-    #         encoder_labels.view(-1)
-    #     )
-
-    #     last_hidden = lm_out.hidden_states[-1]
-    #     if last_hidden.dim() == 2:
-    #         B, L = encoder_attention_mask.shape
-    #         H = last_hidden.size(-1)
-    #         repad = torch.zeros(B * L, H,
-    #                             device=last_hidden.device,
-    #                             dtype=last_hidden.dtype)
-    #         repad[encoder_attention_mask.view(-1).bool()] = last_hidden
-    #         last_hidden = repad.view(B, L, H)
-
-    #     cls_hiddens = last_hidden[:, :1]
-
-    #     decoder_embedding_output = self.decoder_embeddings(input_ids=decoder_input_ids)
-    #     hiddens = torch.cat([cls_hiddens, decoder_embedding_output[:, 1:]], dim=1)
-
-    #     seq_len = hiddens.size(1)
-    #     query = cls_hiddens.expand(-1, seq_len, -1).contiguous()
-
-    #     matrix_attention_mask = self.lm.get_extended_attention_mask(
-    #         decoder_attention_mask,
-    #         decoder_attention_mask.shape,
-    #         decoder_attention_mask.device
-    #     )
-
-    #     hiddens = self.c_head(query=query,
-    #                           key=hiddens,
-    #                           value=hiddens,
-    #                           attention_mask=matrix_attention_mask)[0]
-        
-    #     # 4. dec loss
-    #     pred_scores, loss_dec = self.mlm_loss(hiddens, decoder_labels)
-
-    #     # 5. 두 loss를 합쳐서 반환
-    #     return (loss_enc + loss_dec,)
 
     def forward(self,
                 encoder_input_ids, encoder_attention_mask, encoder_labels,
