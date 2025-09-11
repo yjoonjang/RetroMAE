@@ -50,6 +50,59 @@ def create_book_data(tokenizer_name: str,
                                                     remove_columns=["input_ids"])
     return processed_bookcorpus
 
+def create_kure_data(tokenizer_name: str,
+                     max_seq_length: int):
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, model_max_length=max_seq_length)
+    target_length = max_seq_length - tokenizer.num_special_tokens_to_add(pair=False)
+
+    def tokenize_function(examples):
+        outputs = tokenizer(
+            examples['text'],
+            add_special_tokens=False,
+            truncation=False,
+            return_attention_mask=False,
+            return_token_type_ids=False,
+        )
+        for i in range(len(outputs['input_ids'])):
+            outputs['input_ids'][i].append(tokenizer.sep_token_id)
+        return outputs
+
+    def group_texts(examples):
+        concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+        total_length = len(concatenated_examples[list(examples.keys())[0]])
+        
+        if total_length < target_length:
+            return {'token_ids': []}
+
+        total_length = (total_length // target_length) * target_length
+        
+        # Split by chunks of max_len
+        result = {
+            k: [t[i : i + target_length] for i in range(0, total_length, target_length)]
+            for k, t in concatenated_examples.items()
+        }
+        # Rename the key to 'token_ids'
+        result['token_ids'] = result.pop('input_ids')
+        return result
+
+    dataset = load_dataset('json', data_files='../raw/samples.jsonl', split='train', cache_dir=None, num_proc=32)
+    
+    tokenized_dataset = dataset.map(
+        tokenize_function,
+        batched=True,
+        num_proc=32,
+        remove_columns=dataset.column_names
+    )
+
+    processed_dataset = tokenized_dataset.map(
+        group_texts,
+        batched=True,
+        num_proc=32,
+        remove_columns=tokenized_dataset.column_names
+    )
+
+    return processed_dataset
+
 
 def create_wiki_data(tokenizer_name: str,
                      max_seq_length: int,
@@ -77,6 +130,7 @@ def create_wiki_data(tokenizer_name: str,
         for sents in examples['input_ids']:
             curr_block = []
             curr_tgt_len = target_length if random.random() > short_seq_prob else random.randint(3, target_length)
+
             for sent in sents:
                 if len(curr_block) >= curr_tgt_len:
                     blocks.append(curr_block)
@@ -118,8 +172,7 @@ def create_passage_data(tokenizer_name: str,
         blocks = []
         for sents in examples['input_ids']:
             curr_block = []
-            curr_tgt_len = target_length if random.random() > short_seq_prob else random.randint(3,
-                                                                                                 target_length)
+            curr_tgt_len = target_length if random.random() > short_seq_prob else random.randint(3, target_length)
             for sent in sents:
                 if len(curr_block) >= curr_tgt_len:
                     blocks.append(curr_block)
@@ -153,6 +206,10 @@ if __name__ == '__main__':
     elif args.data == 'msmarco_passage':
         print('download and preprocess msmarco-passage:')
         dataset = create_passage_data(args.tokenizer_name, args.max_seq_length, args.short_seq_prob)
+        dataset.save_to_disk(args.output_dir)
+    elif args.data == 'kure':
+        print('download and preprocess kure:')
+        dataset = create_kure_data(args.tokenizer_name, args.max_seq_length)
         dataset.save_to_disk(args.output_dir)
     else:
         raise NotImplementedError

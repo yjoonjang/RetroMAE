@@ -130,3 +130,6 @@ try.py
 
 # Pyre type checker
 .pyre/
+
+examples/raw
+examples/pretrain/pretrain_data

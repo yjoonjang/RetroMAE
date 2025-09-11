@@ -23,7 +23,7 @@ class DatasetForPretraining(torch.utils.data.Dataset):
 class RetroMAECollator(DataCollatorForWholeWordMask):
     max_seq_length: int = 512
     encoder_mlm_probability: float = 0.15
-    decoder_mlm_probability: float = 0.15
+    decoder_mlm_probability: float = 0.5
 
     def __call__(self, examples):
         input_ids_batch = []
