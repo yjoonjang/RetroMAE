@@ -133,3 +133,4 @@ try.py
 
 examples/raw
 examples/pretrain/pretrain_data
+wandb/

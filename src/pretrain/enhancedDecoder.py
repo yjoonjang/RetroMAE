@@ -328,7 +328,11 @@ def sdpa_attention_forward(
 	cos, sin = module.rotary_emb(query, position_ids=position_ids)
 	query, key = apply_rotary_pos_emb(query, key, cos, sin)
 
-
+	query = query.to(torch.bfloat16)
+	key = key.to(torch.bfloat16)
+	value = value.to(torch.bfloat16)
+	attention_mask = attention_mask.to(torch.bfloat16)
+	
 	attn_output = F.scaled_dot_product_attention(
 		query,
 		key,
@@ -388,7 +392,9 @@ class ModernBERTCrossAttention(nn.Module):
 			q_len=q_len,
 			kv_len=kv_len,
 		)
-		hidden_states = self.Wo(attn_outputs[0])
+		# hidden_states = self.Wo(attn_outputs[0])
+		attention_output = attn_outputs[0]
+		hidden_states = self.Wo(attention_output.to(self.Wo.weight.dtype))
 
 		return (hidden_states,) + attn_outputs[1:]
 
@@ -402,6 +408,8 @@ class ModernBertLayerForDecoder(nn.Module):
 		self.mlp = ModernBertMLP(config)
 		self.mlp_norm = nn.LayerNorm(config.hidden_size, eps=config.norm_eps)
 
+		self.bfloat16()
+
 	def forward(
 		self,
 		query_states: torch.Tensor,         
@@ -410,6 +418,11 @@ class ModernBertLayerForDecoder(nn.Module):
 		position_ids: Optional[torch.LongTensor],
 		output_attentions: Optional[bool] = False,
 	) -> Tuple[torch.Tensor, ...]:
+
+		# expected_dtype = self.attn_norm.weight.dtype
+
+		# query_states_casted = query_states.to(expected_dtype)
+		# key_value_states_casted = key_value_states.to(expected_dtype)
 
 		attention_outputs = self.attn(
 			self.attn_norm(query_states),

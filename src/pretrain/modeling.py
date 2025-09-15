@@ -30,20 +30,34 @@ class RetroMAEForPretraining(nn.Module):
 	def forward(self,
 				encoder_input_ids, encoder_attention_mask, encoder_labels,
 				decoder_input_ids, decoder_attention_mask, decoder_labels):
+				
+
 		lm_out: MaskedLMOutput = self.lm(
 			encoder_input_ids, encoder_attention_mask,
 			labels=encoder_labels,
 			output_hidden_states=True,
 			return_dict=True
 		)
-		cls_hiddens = lm_out.hidden_states[-1][:, :1]  # B 1 D
+		
+		seqlens_in_batch = encoder_attention_mask.sum(dim=-1, dtype=torch.int32)
+		cu_seqlens = torch.nn.functional.pad(torch.cumsum(seqlens_in_batch, dim=0, dtype=torch.int32), (1, 0))
+		cls_indices = cu_seqlens[:-1]
+
+		unpadded_hiddens = lm_out.hidden_states[-1]
+		cls_hiddens = unpadded_hiddens[cls_indices]  # [batch_size, hidden_dim] 형태가 됨
+
+		if cls_hiddens.dim() == 2:
+			cls_hiddens = cls_hiddens.unsqueeze(1)  # [B, D] -> [B, 1, D]
 
 		decoder_embedding_output = self.decoder_embeddings(input_ids=decoder_input_ids)
+
 		hiddens = torch.cat([cls_hiddens, decoder_embedding_output[:, 1:]], dim=1)
 
-		decoder_position_ids = self.lm.model.embeddings.position_ids[:, :decoder_input_ids.size(1)]
-		decoder_position_embeddings = self.lm.model.embeddings.position_embeddings(decoder_position_ids)  # B L D
-		query = decoder_position_embeddings + cls_hiddens
+		seq_length = decoder_input_ids.size(1)
+		device = decoder_input_ids.device
+		decoder_position_ids = torch.arange(seq_length, dtype=torch.long, device=device).unsqueeze(0)
+
+		query = cls_hiddens.expand(-1, seq_length, -1)
 
 		matrix_attention_mask = self.lm.get_extended_attention_mask(
 			decoder_attention_mask,
@@ -64,7 +78,9 @@ class RetroMAEForPretraining(nn.Module):
 		return (loss + lm_out.loss,)
 
 	def mlm_loss(self, hiddens, labels):
-		pred_scores = self.lm.cls(hiddens)
+		head_output = self.lm.head(hiddens)
+		pred_scores = self.lm.decoder(head_output)
+		
 		masked_lm_loss = self.cross_entropy(
 			pred_scores.view(-1, self.lm.config.vocab_size),
 			labels.view(-1)

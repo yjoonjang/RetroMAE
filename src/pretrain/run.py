@@ -103,7 +103,7 @@ def main():
 			model_args.model_name_or_path, 
 			attn_implementation="flash_attention_2", 
 			dtype=torch.bfloat16, 
-			sparse_prediction=True, 
+			sparse_prediction=False, 
 			decoder_bias=False
 		)
 		# model = model_class.from_pretrained(model_args, model_args.model_name_or_path)

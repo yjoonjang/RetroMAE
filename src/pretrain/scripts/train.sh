@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=4,5,6,7 torchrun --nproc_per_node 4 -m pretrain.run \
+CUDA_VISIBLE_DEVICES=3 torchrun --nproc_per_node 1 -m pretrain.run \
   --output_dir ../../MODELS/ \
   --data_dir /mnt/raid6/yjoonjang/projects/RetroMAE/examples/pretrain/pretrain_data/kure \
   --do_train True \
