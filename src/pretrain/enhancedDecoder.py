@@ -323,7 +323,6 @@ def sdpa_attention_forward(
 	key, value = kv.view(bs, kv_len, 2, module.num_heads, module.head_dim).unbind(2)
 	key = key.transpose(1, 2)
 	value = value.transpose(1, 2)
-	# query, key, value: [bs, num_heads, seq_len, head_dim]
 
 	cos, sin = module.rotary_emb(query, position_ids=position_ids)
 	query, key = apply_rotary_pos_emb(query, key, cos, sin)
