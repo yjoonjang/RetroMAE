@@ -44,3 +44,22 @@ class PreTrainer(Trainer):
 
         # Good practice: save your training arguments together with the trained model
         torch.save(self.args, os.path.join(output_dir, "training_args.bin"))
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        outputs = model(**inputs)
+        
+        if isinstance(outputs, dict):
+            loss = outputs['loss']
+            # wandb에 각 loss 로깅
+            if self.state.global_step > 0:  # 첫 번째 step 이후에 로깅
+                self.log({
+                    'train/encoder_mlm_loss': outputs['encoder_mlm_loss'].item(),
+                    'train/decoder_mlm_loss': outputs['decoder_mlm_loss'].item(), 
+                    'train/bow_loss': outputs['bow_loss'].item(),
+                    # 'train/weighted_bow_loss': outputs['weighted_bow_loss'].item(),
+                })
+        else:
+            # RetroMAE의 경우
+            loss = outputs[0] if isinstance(outputs, tuple) else outputs.loss
+            
+        return (loss, outputs) if return_outputs else loss
