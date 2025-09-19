@@ -87,6 +87,7 @@ class DupMAECollator(DataCollatorForWholeWordMask):
     max_seq_length: int = 512
     encoder_mlm_probability: float = 0.3
     decoder_mlm_probability: float = 0.5
+    vocab_size: int = None  # 모델의 vocab_size를 받을 파라미터
 
     def __call__(self, examples):
         input_ids_batch = []
@@ -126,9 +127,11 @@ class DupMAECollator(DataCollatorForWholeWordMask):
             encoder_mlm_mask_batch.append(torch.tensor(text_encoder_mlm_mask))
             decoder_matrix_attention_mask_batch.append(1 - torch.tensor(text_matrix_attention_mask))
 
-            weight = torch.zeros(size=(self.tokenizer.vocab_size,))
+            # 모델의 vocab_size 사용 (tokenizer보다 클 수 있음)
+            model_vocab_size = self.vocab_size if self.vocab_size is not None else self.tokenizer.vocab_size
+            weight = torch.zeros(size=(model_vocab_size,))
             for t in e['token_ids'][:tgt_len]:
-                weight[t] = 1 / len(e['token_ids'][:tgt_len])
+				weight[t] = 1 / len(e['token_ids'][:tgt_len])
             bag_word_weight.append(weight.unsqueeze(0))
 
         input_ids_batch = tensorize_batch(input_ids_batch, self.tokenizer.pad_token_id)

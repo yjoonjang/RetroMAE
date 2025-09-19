@@ -4,7 +4,7 @@ import sys
 
 import transformers
 import torch
-
+sys.path.append(os.getcwd())
 from pretrain.arguments import DataTrainingArguments, ModelArguments
 from pretrain.data import DatasetForPretraining, RetroMAECollator, DupMAECollator
 from pretrain.modeling import RetroMAEForPretraining
@@ -106,7 +106,6 @@ def main():
 			sparse_prediction=False, 
 			decoder_bias=False
 		)
-		# model = model_class.from_pretrained(model_args, model_args.model_name_or_path)
 		logger.info(f"------Load model from {model_args.model_name_or_path}------")
 		tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 	elif model_args.config_name:
@@ -119,10 +118,14 @@ def main():
 		raise ValueError("You must provide the model_name_or_path or config_name")
 
 	dataset = DatasetForPretraining(data_args.data_dir)
+	
+	# 모델의 vocab_size를 collator에 전달
+	model_vocab_size = model.lm.config.vocab_size
 	data_collator = collator_class(tokenizer,
 									 encoder_mlm_probability=data_args.encoder_mlm_probability,
 									 decoder_mlm_probability=data_args.decoder_mlm_probability,
-									 max_seq_length=data_args.max_seq_length)
+									 max_seq_length=data_args.max_seq_length,
+									 vocab_size=model_vocab_size)
 
 	# Initialize our Trainer
 	trainer = PreTrainer(
